@@ -61,6 +61,7 @@ class Manager
 
         // other registered namespaces
         $namespaces = \Lang::getLoader()->namespaces();
+        dd($namespaces);
         foreach ($namespaces as $namespace => $dir) {
             $counter += $this->importArrayTranslations($replace, $dir, $namespace);
         }
@@ -301,6 +302,7 @@ class Manager
         if (! is_null($group) && ! $json) {
             if (! in_array($group, $this->config['exclude_groups'])) {
                 $vendor = false;
+
                 if ($group == '*') {
                     return $this->exportAllTranslations();
                 } else {
@@ -309,20 +311,25 @@ class Manager
                     }
                 }
 
+                $namespaces = TranslationNamespace::all()->pluck('path', 'namespace');
                 $tree = $this->makeTree(Translation::ofTranslatedGroup($group)
                                                     ->orderByGroupKeys(Arr::get($this->config, 'sort_keys', false))
                                                     ->get());
-                $namespaces = TranslationNamespace::all()->pluck('path', 'namespace');
-
                 $group_name = $group;
                 foreach ($tree as $locale => $groups) {
                     if (isset($groups[$group_name])) {
                         $translations = $groups[$group_name];
                         $path = $this->app['path.lang'];
 
-                        if (Str::contains($group, '::')) {
-                            list($namespace, $group) = explode('::', $group, 2);
-                            $path = $namespaces[$namespace] ?? $this->app['path.lang'];
+                        if (Str::contains($group_name, '::')) {
+                            $key = $namespaces->keys()->search(Str::before($group_name, '::'));
+
+                            if ($key !== false) {
+                                $group = 'vendor/' . $namespaces->keys()[$key] . '/' . Str::after($group_name, '::');
+                                $vendor = true;
+                            } else {
+                                $vendor = false;
+                            }
                         }
 
                         if ($vendor) {
